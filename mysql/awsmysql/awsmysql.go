@@ -32,6 +32,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/XSAM/otelsql"
@@ -96,8 +97,17 @@ func (uo *URLOpener) OpenMySQLURL(ctx context.Context, u *url.URL) (*sql.DB, err
 			profile = q.Get("aws_profile")
 		)
 		q.Del("aws_profile")
+		certPool, err := source.RDSCertPool(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("open OpenMySQLURL: get RDS cert pool: %v", err)
+		}
 		cfg, err := config.LoadDefaultConfig(ctx,
-			config.WithSharedConfigProfile(profile)) // Ignored if empty.
+			config.WithSharedConfigProfile(profile),
+			config.WithHTTPClient(&http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{RootCAs: certPool},
+				},
+			})) // Ignored if empty.
 		if err != nil {
 			return nil, fmt.Errorf("open OpenMySQLURL: load AWS config: %v", err)
 		}
